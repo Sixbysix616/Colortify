@@ -13,11 +13,10 @@ CLIENT_SECRET = "6a70277ad2354cf88735f09e67cad3b1"
 REDIRECT_URI = "http://127.0.0.1:8888/callback"
 SCOPE = "user-library-read"
 
-# 红色 HSV
-TARGET_HUE = 0.0        # 红色在HSV中0或1
-HUE_TOLERANCE = 0.05    # 色相容差
-MIN_SATURATION = 0.4    # 饱和度阈值
-MIN_VALUE = 0.2        # 明度阈值
+TARGET_HUE = 0.0        
+HUE_TOLERANCE = 0.05    # Hue Tolerance
+MIN_SATURATION = 0.4    # Saturation Threshold
+MIN_VALUE = 0.2        # Brgightness Threshold
 
 # -----------------------------
 # Spotify API
