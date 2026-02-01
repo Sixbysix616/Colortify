@@ -1,3 +1,4 @@
+
 # Module for generating playlists based on color analysis
 from color_analysis import analyze_track_color
 
