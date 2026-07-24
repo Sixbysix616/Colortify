@@ -3,7 +3,3 @@ dist
 .env
 .env.local
 *.log
-
-# legacy Python prototype artifacts
-__pycache__/
-.cache
