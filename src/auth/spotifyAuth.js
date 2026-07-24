@@ -16,6 +16,14 @@ const VERIFIER_KEY = "colortify_code_verifier";
 const STATE_KEY = "colortify_auth_state";
 const REFRESH_KEY = "colortify_refresh_token";
 
+// The PKCE verifier and OAuth state must survive the full-page redirect to
+// Spotify and back. sessionStorage is technically per-tab and usually survives
+// same-tab navigations, but it can be dropped across the redirect in some
+// browsers/privacy modes, which surfaces as an intermittent "state mismatch".
+// localStorage is durable across the handshake; we always clear these values
+// immediately once consumed, so nothing lingers.
+const handshakeStore = window.localStorage;
+
 // Step 1: build the authorize URL and redirect the browser to Spotify.
 export async function beginLogin() {
   if (!CLIENT_ID || !REDIRECT_URI) {
@@ -27,8 +35,11 @@ export async function beginLogin() {
   const challenge = await generateCodeChallenge(verifier);
   const state = generateState();
 
-  sessionStorage.setItem(VERIFIER_KEY, verifier);
-  sessionStorage.setItem(STATE_KEY, state);
+  // Persist the verifier and state BEFORE redirecting. A fresh login always
+  // overwrites any stale values, so a previously abandoned attempt can't leak
+  // an old state into this one.
+  handshakeStore.setItem(VERIFIER_KEY, verifier);
+  handshakeStore.setItem(STATE_KEY, state);
 
   const params = new URLSearchParams({
     client_id: CLIENT_ID,
@@ -47,19 +58,26 @@ export async function beginLogin() {
 export async function handleCallback() {
   const url = new URL(window.location.href);
   const code = url.searchParams.get("code");
-  const state = url.searchParams.get("state");
+  const returnedState = url.searchParams.get("state");
   const error = url.searchParams.get("error");
 
   if (error) throw new Error(`Spotify auth error: ${error}`);
   if (!code) throw new Error("No authorization code in callback URL.");
 
-  const storedState = sessionStorage.getItem(STATE_KEY);
-  if (!storedState || storedState !== state) {
+  // Read and immediately consume the handshake values: whatever happens next,
+  // this state/verifier pair is used exactly once and cannot interfere with a
+  // later attempt.
+  const storedState = handshakeStore.getItem(STATE_KEY);
+  const verifier = handshakeStore.getItem(VERIFIER_KEY);
+  handshakeStore.removeItem(STATE_KEY);
+  handshakeStore.removeItem(VERIFIER_KEY);
+
+  if (!storedState || storedState !== returnedState) {
     throw new Error("State mismatch — possible CSRF. Please log in again.");
   }
-
-  const verifier = sessionStorage.getItem(VERIFIER_KEY);
-  if (!verifier) throw new Error("Missing PKCE code verifier. Log in again.");
+  if (!verifier) {
+    throw new Error("Missing PKCE code verifier. Please log in again.");
+  }
 
   const body = new URLSearchParams({
     client_id: CLIENT_ID,
@@ -80,8 +98,6 @@ export async function handleCallback() {
   }
   const data = await res.json();
 
-  sessionStorage.removeItem(VERIFIER_KEY);
-  sessionStorage.removeItem(STATE_KEY);
   if (data.refresh_token) {
     sessionStorage.setItem(REFRESH_KEY, data.refresh_token);
   }
@@ -112,6 +128,6 @@ export async function refreshAccessToken() {
 
 export function logout() {
   sessionStorage.removeItem(REFRESH_KEY);
-  sessionStorage.removeItem(VERIFIER_KEY);
-  sessionStorage.removeItem(STATE_KEY);
+  handshakeStore.removeItem(VERIFIER_KEY);
+  handshakeStore.removeItem(STATE_KEY);
 }
