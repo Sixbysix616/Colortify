@@ -1,7 +1,13 @@
 {
   "permissions": {
     "allow": [
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(cd \"c:/Users/juw3/Downloads/Colortify\" && find . -iname \"*.gif\" -not -path \"*/node_modules/*\" -not -path \"*/.git/*\" 2>/dev/null; echo \"---Downloads---\"; find \"/c/Users/juw3/Downloads\" -maxdepth 1 -iname \"*.gif\" 2>/dev/null | head)",
+      "Read(//c/Users/juw3/Downloads/**)",
+      "Bash(cd \"c:/Users/juw3/Downloads/Colortify\" && cp \"/c/Users/juw3/Downloads/Colortify — sort your liked songs by color - Google Chrome 2026-07-24 17-34-53.gif\" ./demo.gif && ls -lh demo.gif)"
+    ],
+    "additionalDirectories": [
+      "C:\\Users\\juw3\\Downloads"
     ]
   }
 }
