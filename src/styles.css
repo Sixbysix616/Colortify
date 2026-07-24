@@ -24,19 +24,25 @@ body,
 body {
   font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color: var(--ink);
+  background: #111; /* base behind the rainbow band layer */
+}
 
-  /* Rainbow palette as horizontal stripes — 7 equal bands, hard edges. */
-  background: linear-gradient(
-    to bottom,
-    var(--stripe-red) 0 14.2857%,
-    var(--stripe-orange) 14.2857% 28.5714%,
-    var(--stripe-yellow) 28.5714% 42.8571%,
-    var(--stripe-green) 42.8571% 57.1428%,
-    var(--stripe-blue) 57.1428% 71.4285%,
-    var(--stripe-indigo) 71.4285% 85.7142%,
-    var(--stripe-purple) 85.7142% 100%
-  );
-  background-attachment: fixed;
+/* Fixed rainbow band layer, rendered by <RainbowBackground>. The 7 bands are
+   flex children of a vertical column; their flex-grow (thickness) is animated
+   in JS: a flowing wave while loading, then settling to widths proportional to
+   each color bucket's track count on the results screen. */
+.bg-rainbow {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  display: flex;
+  flex-direction: column;
+}
+
+.bg-band {
+  flex-basis: 0;
+  min-height: 0;
+  width: 100%;
 }
 
 .app {
@@ -200,6 +206,21 @@ body {
   border: 1px solid #eaeaea;
   display: flex;
   flex-direction: column;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.card:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 14px 32px rgba(0, 0, 0, 0.22);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .card,
+  .card:hover {
+    transition: none;
+    transform: none;
+  }
 }
 
 .card-swatch {

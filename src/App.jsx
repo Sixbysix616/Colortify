@@ -1,12 +1,13 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { beginLogin, handleCallback } from "./auth/spotifyAuth.js";
 import { fetchAllLikedSongs } from "./spotify/likedSongs.js";
 import { createColorPlaylist } from "./spotify/playlists.js";
 import { analyzeTracks } from "./color/extract.js";
-import { groupByBucket } from "./color/bucket.js";
+import { groupByBucket, BUCKET_ORDER } from "./color/bucket.js";
 import LoginScreen from "./components/LoginScreen.jsx";
 import ProgressView from "./components/ProgressView.jsx";
 import BucketGrid from "./components/BucketGrid.jsx";
+import RainbowBackground from "./components/RainbowBackground.jsx";
 
 // App states: loggedOut -> loading -> results
 export default function App() {
@@ -110,8 +111,15 @@ export default function App() {
     }
   }
 
+  // Per-bucket counts (in BUCKET_ORDER) drive the results-state band widths.
+  const bucketCounts = useMemo(
+    () => (groups ? BUCKET_ORDER.map((name) => groups[name]?.length || 0) : null),
+    [groups]
+  );
+
   return (
     <div className="app">
+      <RainbowBackground status={status} counts={bucketCounts} />
       <div className="app-inner">
         {status === "loggedOut" && (
           <LoginScreen onLogin={handleLogin} error={error} />
