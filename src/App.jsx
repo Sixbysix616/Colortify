@@ -1,0 +1,136 @@
+import { useEffect, useRef, useState } from "react";
+import { beginLogin, handleCallback } from "./auth/spotifyAuth.js";
+import { fetchAllLikedSongs } from "./spotify/likedSongs.js";
+import { createColorPlaylist } from "./spotify/playlists.js";
+import { analyzeTracks } from "./color/extract.js";
+import { groupByBucket } from "./color/bucket.js";
+import LoginScreen from "./components/LoginScreen.jsx";
+import ProgressView from "./components/ProgressView.jsx";
+import BucketGrid from "./components/BucketGrid.jsx";
+
+// App states: loggedOut -> loading -> results
+export default function App() {
+  const [status, setStatus] = useState("loggedOut");
+  const [token, setToken] = useState(null);
+  const [error, setError] = useState(null);
+
+  const [phase, setPhase] = useState("fetching"); // "fetching" | "analyzing"
+  const [progress, setProgress] = useState({ loaded: 0, total: 0 });
+
+  const [groups, setGroups] = useState(null);
+  const [playlistState, setPlaylistState] = useState({});
+
+  // Guard against React 18 StrictMode double-invoking the callback effect.
+  const ranCallback = useRef(false);
+
+  // Handle the OAuth redirect back to /callback exactly once.
+  useEffect(() => {
+    const isCallback =
+      window.location.pathname.startsWith("/callback") &&
+      window.location.search.includes("code=");
+    if (!isCallback || ranCallback.current) return;
+    ranCallback.current = true;
+
+    (async () => {
+      try {
+        const { accessToken } = await handleCallback();
+        setToken(accessToken);
+        // Clean the code/state out of the URL.
+        window.history.replaceState({}, document.title, "/");
+      } catch (e) {
+        setError(e.message);
+        setStatus("loggedOut");
+      }
+    })();
+  }, []);
+
+  // Once we have a token, run the full pipeline.
+  useEffect(() => {
+    if (!token) return;
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setStatus("loading");
+        setPhase("fetching");
+        const tracks = await fetchAllLikedSongs(token, (loaded, total) => {
+          if (!cancelled) setProgress({ loaded, total });
+        });
+
+        if (cancelled) return;
+        setPhase("analyzing");
+        setProgress({ loaded: 0, total: tracks.length });
+        const analyzed = await analyzeTracks(tracks, {
+          concurrency: 6,
+          onProgress: (loaded, total) => {
+            if (!cancelled) setProgress({ loaded, total });
+          },
+        });
+
+        if (cancelled) return;
+        setGroups(groupByBucket(analyzed));
+        setStatus("results");
+      } catch (e) {
+        if (!cancelled) {
+          setError(e.message);
+          setStatus("loggedOut");
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [token]);
+
+  async function handleLogin() {
+    setError(null);
+    try {
+      await beginLogin();
+    } catch (e) {
+      setError(e.message);
+    }
+  }
+
+  async function handleCreate(name) {
+    const tracks = groups[name];
+    if (!tracks?.length) return;
+    setPlaylistState((s) => ({ ...s, [name]: { status: "creating" } }));
+    try {
+      const { url } = await createColorPlaylist(token, {
+        colorName: name,
+        uris: tracks.map((t) => t.uri),
+      });
+      setPlaylistState((s) => ({ ...s, [name]: { status: "done", url } }));
+    } catch (e) {
+      setPlaylistState((s) => ({
+        ...s,
+        [name]: { status: "error", error: e.message },
+      }));
+    }
+  }
+
+  return (
+    <div className="app">
+      <div className="app-inner">
+        {status === "loggedOut" && (
+          <LoginScreen onLogin={handleLogin} error={error} />
+        )}
+        {status === "loading" && (
+          <ProgressView
+            phase={phase}
+            loaded={progress.loaded}
+            total={progress.total}
+          />
+        )}
+        {status === "results" && groups && (
+          <BucketGrid
+            groups={groups}
+            playlistState={playlistState}
+            onCreate={handleCreate}
+          />
+        )}
+      </div>
+    </div>
+  );
+}
